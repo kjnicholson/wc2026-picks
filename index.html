@@ -283,6 +283,8 @@ footer .d{color:var(--gold)}
 .trow2 b.pos{color:var(--pos)} .trow2 b.gold{color:var(--gold)}
 .trow2 .chev{margin-left:auto}
 .trow2 .tmore{margin-left:auto;color:var(--faint);font-size:11px;letter-spacing:.04em;flex:0 0 auto}
+.tiphead{font-size:11.5px;color:var(--faint);line-height:1.5;padding:0 2px 10px}
+.tiphead b{color:var(--pos);font-weight:600}
 
 /* ---- play rows (game view + futures) ---- */
 .prow{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--hair)}
@@ -397,7 +399,7 @@ footer .d{color:var(--gold)}
   <footer>
     plays priced -250 to +300 · lines refresh ~3h, 8am–11pm ET<br>
     odds as of — DK 2026-06-11 · Pinnacle/Betfair 2026-06-11 · Kalshi 2026-06-11 · Polymarket 2026-06-11<br>
-    generated <span class="d">2026-06-10 22:00 ET</span> · Keith's picks &amp; running record (stakes in units)
+    generated <span class="d">2026-06-10 22:13 ET</span> · Keith's picks &amp; running record (stakes in units)
   </footer>
 </div>
 <script>
@@ -738,30 +740,10 @@ const midOf = b => +String(b.id).split("|")[2];
 const isEV = b => b.anchored && b.edge != null && b.edge > 0;
 const heroEV = b => b.anchored && b.edge != null && b.edge >= 0.02;   // the ✓ bar
 
-/* The games ARE the page (hierarchy fix 2026-06-10): the old hero ticket — a global
-   cross-game bet list — read as "these are the bets, done" and let trap-flagged
-   longshots headline as "worth real money". Every play now lives inside its game;
-   what survives up top is one honest line, and traps drop to a closed dropdown. */
-function cleanEV(md) { return md.plays.filter(b => isSug(b) && heroEV(b) && !b.trap); }
-function cleanEVF() { return DAYIDX === 0 ? SLATE.filter(b => isSug(b) && b.edge != null && b.edge >= 0.02 && !b.trap) : []; }
-
-function summaryStrip(md) {
-  const ev = cleanEV(md), evF = cleanEVF();
-  const total = ev.reduce((s, b) => s + (b.kelly != null ? b.kelly : (b.sugg || 0)), 0);
-  // Venue savings — the documented retail edge is the PRICE, so say it out loud.
-  const mls = md.plays.filter(b => b.market === "ml" && b.dk != null);
-  const saved = mls.filter(b => b.venue === "Kalshi")
-    .map(b => (amToDec(b.american) || 0) - (amToDec(b.dk) || 0)).filter(x => x > 0);
-  const savings = saved.length
-    ? `Kalshi beats DK on ${saved.length}/${mls.length} win-bet price${mls.length === 1 ? "" : "s"} today${PUBLIC ? "" : ` (avg +$${(saved.reduce((s, x) => s + x, 0) / saved.length).toFixed(2)} per $1)`} — always check both books.`
-    : "";
-  let lead = ev.length
-    ? `<b class="pos">${ev.length} play${ev.length === 1 ? "" : "s"} worth real money (${usd(total)})</b> — inside the games below`
-    : `Nothing worth real money ${DAYIDX === 1 ? "tomorrow" : "today"} — the games below carry the fun lane`;
-  if (evF.length) lead += ` · <b class="pos">${evF.length}</b> on <b>Futures</b>`;
-  return `<div class="card hero"><div class="lead" style="padding-bottom:13px">${lead}${savings ? `<div class="lean" style="padding:6px 0 0">${savings}</div>` : ""}</div></div>`;
-}
-
+/* The games ARE the page (hierarchy fix 2026-06-10): no global bet list at all — every
+   play lives inside its game, traps drop to a closed dropdown, and one quiet caption
+   teaches the tap. (Per-play price-shopping lives where it matters: the sheet's
+   "best price at Kalshi" line.) */
 function trapsBlock(md) {
   const t = md.plays.filter(b => isSug(b) && heroEV(b) && b.trap);
   const tF = DAYIDX === 0 ? SLATE.filter(b => isSug(b) && b.edge != null && b.edge >= 0.02 && b.trap) : [];
@@ -800,7 +782,8 @@ function renderMatches() {
   if (!games.length) { $("#matches-panel").innerHTML = dayNav() + recordStrip() + `<div class="card"><div class="empty"><div class="big">No match day live</div>The game tiles appear here on a match day (group stage opens Jun 11).</div></div>` + scoreboardBlock(); return; }
   let h = dayNav();
   if (md.banner) h += `<div class="card banner">${esc(md.banner)}</div>`;
-  h += recordStrip() + summaryStrip(md);
+  h += recordStrip();
+  h += `<div class="tiphead">Tap a game for the full breakdown — any plays worth real money are marked in <b>green</b> inside.</div>`;
   h += `<div class="stack">${games.map(g => tile(g, byMid[g.match_id] || [])).join("")}</div>`;
   h += trapsBlock(md);
   $("#matches-panel").innerHTML = h + legendBlock() + scoreboardBlock();
