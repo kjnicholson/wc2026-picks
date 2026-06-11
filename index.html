@@ -399,7 +399,7 @@ footer .d{color:var(--gold)}
   <footer>
     plays priced -250 to +300 · lines refresh ~3h, 8am–11pm ET<br>
     odds as of — DK 2026-06-11 · Pinnacle/Betfair 2026-06-11 · Kalshi 2026-06-11 · Polymarket 2026-06-11<br>
-    generated <span class="d">2026-06-10 22:13 ET</span> · Keith's picks &amp; running record (stakes in units)
+    generated <span class="d">2026-06-10 22:34 ET</span> · Keith's picks &amp; running record (stakes in units)
   </footer>
 </div>
 <script>
@@ -783,7 +783,7 @@ function renderMatches() {
   let h = dayNav();
   if (md.banner) h += `<div class="card banner">${esc(md.banner)}</div>`;
   h += recordStrip();
-  h += `<div class="tiphead">Tap a game for the full breakdown — any plays worth real money are marked in <b>green</b> inside.</div>`;
+  h += `<div class="tiphead">Tap a game for the full breakdown — any bet in <b>green</b> represents edge against the books.</div>`;
   h += `<div class="stack">${games.map(g => tile(g, byMid[g.match_id] || [])).join("")}</div>`;
   h += trapsBlock(md);
   $("#matches-panel").innerHTML = h + legendBlock() + scoreboardBlock();
