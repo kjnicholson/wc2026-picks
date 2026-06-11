@@ -282,6 +282,7 @@ footer .d{color:var(--gold)}
 .trow2 b{font-weight:600;color:var(--ink)}
 .trow2 b.pos{color:var(--pos)} .trow2 b.gold{color:var(--gold)}
 .trow2 .chev{margin-left:auto}
+.trow2 .tmore{margin-left:auto;color:var(--faint);font-size:11px;letter-spacing:.04em;flex:0 0 auto}
 
 /* ---- play rows (game view + futures) ---- */
 .prow{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--hair)}
@@ -396,7 +397,7 @@ footer .d{color:var(--gold)}
   <footer>
     plays priced -250 to +300 · lines refresh ~3h, 8am–11pm ET<br>
     odds as of — DK 2026-06-11 · Pinnacle/Betfair 2026-06-11 · Kalshi 2026-06-11 · Polymarket 2026-06-11<br>
-    generated <span class="d">2026-06-10 20:03 ET</span> · Keith's picks &amp; running record (stakes in units)
+    generated <span class="d">2026-06-10 22:00 ET</span> · Keith's picks &amp; running record (stakes in units)
   </footer>
 </div>
 <script>
@@ -724,7 +725,7 @@ function legendBlock() {
     <b>● gold dot / ● grey dot</b> model vs market on the same track — a wide gap is a lean: an opinion, never proof of value ·
     <b>green +edge</b> genuinely +EV vs the sharp fair price — the only mark that claims real value; carries a sized stake (½-Kelly) ·
     <b>⚠ trap</b> price past +400, or model well under the sharp fair — historically the losing bucket even when +EV on paper; half stake or pass ·
-    <b>likely dots ●●●○○</b> how likely the play LANDS, not how good a bet it is — sets the fun-stake ladder (1 pass · 2 ½ unit · 3 1 unit · 4 1½ units · 5 2 units) ·
+    <b>likely dots ●●●○○</b> how likely the play LANDS, not how good a bet it is — sets the fun-stake ladder (1 pass · 2 ½ unit · 3 1 unit · 4 1½ units · 5 2 units); keep the day's fun lane under ${usd(START * 0.0375)} ·
     <b>${PUBLIC ? "stake" : "$"} suggested</b> green plays = the sized Kelly stake; everything else = the fun-unit ladder${PUBLIC ? " (shown in units)" : ""} ·
     <b>DK / Kalshi</b> which book has the best price (we shop both on win bets) — "take X or better" is the price to demand ·
     <b>r</b> only retail books price this line (no Pinnacle/Betfair) ·
@@ -737,38 +738,44 @@ const midOf = b => +String(b.id).split("|")[2];
 const isEV = b => b.anchored && b.edge != null && b.edge > 0;
 const heroEV = b => b.anchored && b.edge != null && b.edge >= 0.02;   // the ✓ bar
 
-function ticketBlock(md) {
-  const plays = md.plays;
-  const sug = plays.filter(b => isSug(b));
-  // Clean plays first, trap-flagged longshots last — the biggest paper edge is usually
-  // the least trustworthy one, and it must not headline the block.
-  const evSort = (a, b) => ((a.trap ? 1 : 0) - (b.trap ? 1 : 0)) || (b.edge - a.edge);
-  const ev = sug.filter(heroEV).sort(evSort);
-  const evF = DAYIDX === 0 ? SLATE.filter(b => isSug(b) && b.edge != null && b.edge >= 0.02).sort(evSort) : [];
-  const nev = ev.length + evF.length;
-  const total = [...ev, ...evF].reduce((s, b) => s + (b.kelly != null ? b.kelly : (b.sugg || 0)), 0);
-  const leans = sug.filter(b => !b.scorer && b.lean != null && b.lean >= 5).sort((a, b) => b.lean - a.lean);
-  const L0 = leans[0];
+/* The games ARE the page (hierarchy fix 2026-06-10): the old hero ticket — a global
+   cross-game bet list — read as "these are the bets, done" and let trap-flagged
+   longshots headline as "worth real money". Every play now lives inside its game;
+   what survives up top is one honest line, and traps drop to a closed dropdown. */
+function cleanEV(md) { return md.plays.filter(b => isSug(b) && heroEV(b) && !b.trap); }
+function cleanEVF() { return DAYIDX === 0 ? SLATE.filter(b => isSug(b) && b.edge != null && b.edge >= 0.02 && !b.trap) : []; }
+
+function summaryStrip(md) {
+  const ev = cleanEV(md), evF = cleanEVF();
+  const total = ev.reduce((s, b) => s + (b.kelly != null ? b.kelly : (b.sugg || 0)), 0);
   // Venue savings — the documented retail edge is the PRICE, so say it out loud.
-  const mls = plays.filter(b => b.market === "ml" && b.dk != null);
+  const mls = md.plays.filter(b => b.market === "ml" && b.dk != null);
   const saved = mls.filter(b => b.venue === "Kalshi")
     .map(b => (amToDec(b.american) || 0) - (amToDec(b.dk) || 0)).filter(x => x > 0);
   const savings = saved.length
     ? `Kalshi beats DK on ${saved.length}/${mls.length} win-bet price${mls.length === 1 ? "" : "s"} today${PUBLIC ? "" : ` (avg +$${(saved.reduce((s, x) => s + x, 0) / saved.length).toFixed(2)} per $1)`} — always check both books.`
     : "";
-  const ladder = sug.filter(b => !heroEV(b)).reduce((s, b) => s + (b.sugg || 0), 0);
-  let h = `<div class="card hero">`;
-  h += `<div class="lead">The ticket · ${nev ? `<b class="pos">${nev} play${nev === 1 ? "" : "s"} worth real money · ${usd(total)}</b>` : "nothing worth real money " + (DAYIDX === 1 ? "tomorrow" : "today")}</div>`;
-  h += `<div class="lean">${L0 ? `Model's strongest lean: <b>${esc(L0.label)}</b>, ${(L0.model * 100).toFixed(0)}% vs the market's ${(L0.win * 100).toFixed(0)}% — an opinion, not an edge.` : "No strong model leans on this slate."}</div>`;
-  ev.forEach(b => { h += ticketRow(b, false); });
-  evF.forEach(b => { h += ticketRow(b, true); });
-  h += `<div class="evnote">${savings ? savings + "<br>" : ""}Inside each game is the fun lane — no proven value, stakes off the likely-ladder (≈ ${usd(ladder)} in full); keep it under ${usd(START * 0.0375)} a day.</div>`;
-  return h + `</div>`;
+  let lead = ev.length
+    ? `<b class="pos">${ev.length} play${ev.length === 1 ? "" : "s"} worth real money (${usd(total)})</b> — inside the games below`
+    : `Nothing worth real money ${DAYIDX === 1 ? "tomorrow" : "today"} — the games below carry the fun lane`;
+  if (evF.length) lead += ` · <b class="pos">${evF.length}</b> on <b>Futures</b>`;
+  return `<div class="card hero"><div class="lead" style="padding-bottom:13px">${lead}${savings ? `<div class="lean" style="padding:6px 0 0">${savings}</div>` : ""}</div></div>`;
+}
+
+function trapsBlock(md) {
+  const t = md.plays.filter(b => isSug(b) && heroEV(b) && b.trap);
+  const tF = DAYIDX === 0 ? SLATE.filter(b => isSug(b) && b.edge != null && b.edge >= 0.02 && b.trap) : [];
+  const all = [...t, ...tF].sort((a, b) => b.edge - a.edge);
+  if (!all.length) return "";
+  return `<details class="dismissed"><summary>⚠ ${all.length} longshot${all.length === 1 ? "" : "s"} the math likes but history doesn't — show</summary>
+    <div class="card" style="margin-top:8px">${all.map(b => ticketRow(b, b.kind === "future")).join("")}
+    <div class="evnote">Price past +400 or model well under the sharp fair — historically the losing bucket even when +EV on paper. Half stake or pass.</div></div></details>`;
 }
 
 function tile(g, list) {
   const sug = list.filter(b => isSug(b));
-  const nev = sug.filter(heroEV).length, npos = list.filter(b => isPos(b.id)).length;
+  // "worth money" counts CLEAN value only — trap-flagged longshots never inflate it.
+  const nev = sug.filter(b => heroEV(b) && !b.trap).length, npos = list.filter(b => isPos(b.id)).length;
   const [hN, aN] = (g.matchup || " v ").split(" v ");
   const proj = g.exp ? `proj <b>${g.exp[0].toFixed(1)}–${g.exp[1].toFixed(1)}</b> · ` : "";
   const bits = [`${sug.length} play${sug.length === 1 ? "" : "s"}`];
@@ -777,7 +784,7 @@ function tile(g, list) {
   return `<div class="card tile tap" onclick="openGame(${g.match_id})">
     <div class="trow1"><span class="tmu">${esc(g.matchup)}</span><span class="tko">${esc(g.kickoff || "")}</span></div>
     ${triBar(g.p1x2)}${triLeg(g.p1x2, hN, aN)}
-    <div class="trow2">${proj}${bits.join(" · ")}<span class="chev">›</span></div>
+    <div class="trow2">${proj}${bits.join(" · ")}<span class="tmore">breakdown ›</span></div>
   </div>`;
 }
 
@@ -793,8 +800,9 @@ function renderMatches() {
   if (!games.length) { $("#matches-panel").innerHTML = dayNav() + recordStrip() + `<div class="card"><div class="empty"><div class="big">No match day live</div>The game tiles appear here on a match day (group stage opens Jun 11).</div></div>` + scoreboardBlock(); return; }
   let h = dayNav();
   if (md.banner) h += `<div class="card banner">${esc(md.banner)}</div>`;
-  h += recordStrip() + ticketBlock(md);
+  h += recordStrip() + summaryStrip(md);
   h += `<div class="stack">${games.map(g => tile(g, byMid[g.match_id] || [])).join("")}</div>`;
+  h += trapsBlock(md);
   $("#matches-panel").innerHTML = h + legendBlock() + scoreboardBlock();
 }
 
@@ -829,7 +837,6 @@ function renderGameView() {
   const pos = allPlays.filter(b => isPos(b.id));
   const sugT = team.filter(b => isSug(b));
   const sugS = scor.filter(b => isSug(b));
-  const evS = sugS.filter(heroEV), restS = sugS.filter(b => !heroEV(b));
   const dis = allPlays.filter(b => isDis(b));
   // Clean +EV first, trap-flagged +EV after, then the fun lane by the BEST prediction
   // (sharp fair where anchored — prediction-first 2026-06-10); the biggest paper edge
@@ -853,10 +860,15 @@ function renderGameView() {
       <div class="fcnote">● gold = model · ● grey = market (fee removed) · a wide gap is a lean — an opinion, never proof of value. AH/BTTS rows are context only.</div></div>`;
   }
   if (pos.length) h += `<div class="subh">${PUBLIC ? "Keith's bets" : "Your bets"}</div><div class="card">${pos.map(posRow).join("")}</div>`;
-  const plays = [...sugT, ...evS].sort(sortP);
-  if (plays.length) h += `<div class="subh">Plays</div><div class="card">${plays.map(b => b.scorer ? scorerRowV(b) : playRow(b)).join("")}</div>`;
-  if (restS.length) h += `<div class="subh">Goalscorers · most likely</div><div class="card">${restS.map(scorerRowV).join("")}</div>`;
-  if (!plays.length && !restS.length && !pos.length) h += `<div class="card"><div class="empty">Nothing priced for this game.</div></div>`;
+  // How the page is actually used (2026-06-10): the bet is usually a team market —
+  // ML / total / spread lead the Plays lane; ALL scorer props (even +EV ones, which
+  // keep their green pill) sit below in Goalscorers, value-promoted to its top.
+  const plays = sugT.sort(sortP);
+  const scorers = sugS.sort((a, b) => rank(b) - rank(a) ||
+    ((b.model != null ? b.model : b.win) || 0) - ((a.model != null ? a.model : a.win) || 0));
+  if (plays.length) h += `<div class="subh">Plays</div><div class="card">${plays.map(playRow).join("")}</div>`;
+  if (scorers.length) h += `<div class="subh">Goalscorers · most likely</div><div class="card">${scorers.map(scorerRowV).join("")}</div>`;
+  if (!plays.length && !scorers.length && !pos.length) h += `<div class="card"><div class="empty">Nothing priced for this game.</div></div>`;
   if (dis.length) h += dismissedBlock(dis);
   body.innerHTML = h;
   el.classList.add("open"); document.body.style.overflow = "hidden";
